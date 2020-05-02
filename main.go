@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -36,10 +36,26 @@ func loadDog(name string) (*Dog, error) {
 func dogHandler(w http.ResponseWriter, r *http.Request) {
 	name := r.URL.Path[len("/dog/"):]
 	dog, _ := loadDog(name)
-	fmt.Fprintf(w, "<h1>%s</h1><div>%s</div>", dog.Name, dog.About)
+	renderTemplate(w, "dog", dog)
+}
+
+func editHandler(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Path[len("/edit/"):]
+	dog, err := loadDog(name)
+	if err != nil {
+		dog = &Dog{Name: name}
+	}
+	renderTemplate(w, "edit", dog)
+}
+
+func renderTemplate(w http.ResponseWriter, tmpl string, dog *Dog) {
+	t, _ := template.ParseFiles(tmpl + ".html")
+	t.Execute(w, dog)
 }
 
 func main() {
 	http.HandleFunc("/dog/", dogHandler)
+	http.HandleFunc("/edit/", editHandler)
+	// http.HandleFunc("/save/", saveHandler)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
