@@ -35,7 +35,11 @@ func loadDog(name string) (*Dog, error) {
 // dogHandler runs when we hit the "/dog/" endpoint on the HTTP server.
 func dogHandler(w http.ResponseWriter, r *http.Request) {
 	name := r.URL.Path[len("/dog/"):]
-	dog, _ := loadDog(name)
+	dog, err := loadDog(name)
+	if err != nil {
+		http.Redirect(w, r, "/edit/"+name, http.StatusFound)
+		return
+	}
 	renderTemplate(w, "dog", dog)
 }
 
