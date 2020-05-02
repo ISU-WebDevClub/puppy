@@ -52,6 +52,14 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "edit", dog)
 }
 
+func saveHandler(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Path[len("/save/"):]
+	about := r.FormValue("about")
+	dog := &Dog{Name: name, About: []byte(about)}
+	dog.save()
+	http.Redirect(w, r, "/dog/"+name, http.StatusFound)
+}
+
 func renderTemplate(w http.ResponseWriter, tmpl string, dog *Dog) {
 	t, _ := template.ParseFiles(tmpl + ".html")
 	t.Execute(w, dog)
@@ -60,6 +68,6 @@ func renderTemplate(w http.ResponseWriter, tmpl string, dog *Dog) {
 func main() {
 	http.HandleFunc("/dog/", dogHandler)
 	http.HandleFunc("/edit/", editHandler)
-	// http.HandleFunc("/save/", saveHandler)
+	http.HandleFunc("/save/", saveHandler)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
