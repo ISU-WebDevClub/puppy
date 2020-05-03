@@ -7,6 +7,8 @@ import (
 	"net/http"
 )
 
+var templates = template.Must(template.ParseFiles("edit.html", "dog.html"))
+
 // Dog is a data structure to represent a dog.
 type Dog struct {
 	Name  string
@@ -65,12 +67,7 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func renderTemplate(w http.ResponseWriter, tmpl string, dog *Dog) {
-	t, err := template.ParseFiles(tmpl + ".html")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	err = t.Execute(w, dog)
+	err := templates.ExecuteTemplate(w, tmpl+".html", dog)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
