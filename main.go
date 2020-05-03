@@ -1,13 +1,16 @@
 package main
 
 import (
+	"errors"
 	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"regexp"
 )
 
 var templates = template.Must(template.ParseFiles("edit.html", "dog.html"))
+var validPath = regexp.MustCompile("^/(edit|save|dog)/([a-zA-Z0-9]+)$")
 
 // Dog is a data structure to represent a dog.
 type Dog struct {
@@ -36,7 +39,10 @@ func loadDog(name string) (*Dog, error) {
 
 // dogHandler runs when we hit the "/dog/" endpoint on the HTTP server.
 func dogHandler(w http.ResponseWriter, r *http.Request) {
-	name := r.URL.Path[len("/dog/"):]
+	name, err := getName(w, r)
+	if err != nil {
+		return
+	}
 	dog, err := loadDog(name)
 	if err != nil {
 		http.Redirect(w, r, "/edit/"+name, http.StatusFound)
@@ -46,7 +52,10 @@ func dogHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func editHandler(w http.ResponseWriter, r *http.Request) {
-	name := r.URL.Path[len("/edit/"):]
+	name, err := getName(w, r)
+	if err != nil {
+		return
+	}
 	dog, err := loadDog(name)
 	if err != nil {
 		dog = &Dog{Name: name}
@@ -55,10 +64,13 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func saveHandler(w http.ResponseWriter, r *http.Request) {
-	name := r.URL.Path[len("/save/"):]
+	name, err := getName(w, r)
+	if err != nil {
+		return
+	}
 	about := r.FormValue("about")
 	dog := &Dog{Name: name, About: []byte(about)}
-	err := dog.save()
+	err = dog.save()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -71,6 +83,15 @@ func renderTemplate(w http.ResponseWriter, tmpl string, dog *Dog) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func getName(w http.ResponseWriter, r *http.Request) (string, error) {
+	m := validPath.FindStringSubmatch(r.URL.Path)
+	if m == nil {
+		http.NotFound(w, r)
+		return "", errors.New("Invalid dog name")
+	}
+	return m[2], nil // m[2] is the dog's name
 }
 
 func main() {
