@@ -37,12 +37,23 @@ func loadDog(name string) (*Dog, error) {
 	return &Dog{Name: name, About: about}, nil
 }
 
-// dogHandler runs when we hit the "/dog/" endpoint on the HTTP server.
-func dogHandler(w http.ResponseWriter, r *http.Request) {
-	name, err := getName(w, r)
-	if err != nil {
-		return
+// makeHandler returns a function of type http.HandlerFunc. This function
+// validates the name and then passes the name to the function provided as an
+// argument to makeHandler. This allows us to remove the duplicate function calls
+// to validate the name in each handler.
+func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		m := validPath.FindStringSubmatch(r.URL.Path)
+		if m == nil {
+			http.NotFound(w, r)
+			return
+		}
+		fn(w, r, m[2])
 	}
+}
+
+// dogHandler runs when we hit the "/dog/<name>" endpoint on the HTTP server.
+func dogHandler(w http.ResponseWriter, r *http.Request, name string) {
 	dog, err := loadDog(name)
 	if err != nil {
 		http.Redirect(w, r, "/edit/"+name, http.StatusFound)
@@ -51,11 +62,8 @@ func dogHandler(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "dog", dog)
 }
 
-func editHandler(w http.ResponseWriter, r *http.Request) {
-	name, err := getName(w, r)
-	if err != nil {
-		return
-	}
+// editHandler runs when we hit the "/edit/<name>" endpoint on the HTTP server.
+func editHandler(w http.ResponseWriter, r *http.Request, name string) {
 	dog, err := loadDog(name)
 	if err != nil {
 		dog = &Dog{Name: name}
@@ -63,14 +71,11 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "edit", dog)
 }
 
-func saveHandler(w http.ResponseWriter, r *http.Request) {
-	name, err := getName(w, r)
-	if err != nil {
-		return
-	}
+// saveHandler takes information from the HTML form and creates a new dog.
+func saveHandler(w http.ResponseWriter, r *http.Request, name string) {
 	about := r.FormValue("about")
 	dog := &Dog{Name: name, About: []byte(about)}
-	err = dog.save()
+	err := dog.save()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -78,6 +83,8 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/dog/"+name, http.StatusFound)
 }
 
+// renderTemplate is a helper function for executing a given template with the
+// given dog.
 func renderTemplate(w http.ResponseWriter, tmpl string, dog *Dog) {
 	err := templates.ExecuteTemplate(w, tmpl+".html", dog)
 	if err != nil {
@@ -85,6 +92,8 @@ func renderTemplate(w http.ResponseWriter, tmpl string, dog *Dog) {
 	}
 }
 
+// getName validates the dog name in the URL. This is important because this user
+// input is written to the file system.
 func getName(w http.ResponseWriter, r *http.Request) (string, error) {
 	m := validPath.FindStringSubmatch(r.URL.Path)
 	if m == nil {
@@ -95,8 +104,8 @@ func getName(w http.ResponseWriter, r *http.Request) (string, error) {
 }
 
 func main() {
-	http.HandleFunc("/dog/", dogHandler)
-	http.HandleFunc("/edit/", editHandler)
-	http.HandleFunc("/save/", saveHandler)
+	http.HandleFunc("/dog/", makeHandler(dogHandler))
+	http.HandleFunc("/edit/", makeHandler(editHandler))
+	http.HandleFunc("/save/", makeHandler(saveHandler))
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
