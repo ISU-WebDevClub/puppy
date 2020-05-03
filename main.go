@@ -56,13 +56,24 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 	name := r.URL.Path[len("/save/"):]
 	about := r.FormValue("about")
 	dog := &Dog{Name: name, About: []byte(about)}
-	dog.save()
+	err := dog.save()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	http.Redirect(w, r, "/dog/"+name, http.StatusFound)
 }
 
 func renderTemplate(w http.ResponseWriter, tmpl string, dog *Dog) {
-	t, _ := template.ParseFiles(tmpl + ".html")
-	t.Execute(w, dog)
+	t, err := template.ParseFiles(tmpl + ".html")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = t.Execute(w, dog)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func main() {
